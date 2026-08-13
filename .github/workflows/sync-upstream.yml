@@ -1,0 +1,53 @@
+name: Sync Upstream (Umami)
+
+on:
+  schedule:
+    # Every Monday at 13:00 UTC
+    - cron: '0 13 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/umami-software/umami.git
+
+      - name: Fetch upstream
+        run: git fetch upstream master
+
+      - name: Check for new commits
+        id: check
+        run: |
+          BEHIND=$(git rev-list --count master..upstream/master)
+          echo "behind=$BEHIND" >> "$GITHUB_OUTPUT"
+          echo "Fork is behind upstream by $BEHIND commit(s)."
+
+      - name: Create sync branch and pull request
+        if: steps.check.outputs.behind != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="sync-upstream-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          git merge upstream/master --no-edit
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "Sync with umami-software/umami" \
+            --body "Automated sync from upstream (umami-software/umami@master). Review before merging: check for new Prisma migrations, and confirm scripts/check-db.js still honors DIRECT_DATABASE_URL for the Supabase pooled-migration workaround. Merging this PR will trigger a normal Vercel production deploy." \
+            --base master \
+            --head "$BRANCH"
