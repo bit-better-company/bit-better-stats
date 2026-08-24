@@ -45,7 +45,7 @@ jobs:
           BRANCH="sync-upstream-$(date +%Y%m%d)"
           git checkout -b "$BRANCH"
           git merge upstream/master --no-edit
-          git push origin "$BRANCH"
+          git push --force-with-lease origin "$BRANCH"
           gh pr create \
             --title "Sync with umami-software/umami" \
             --body "Automated sync from upstream (umami-software/umami@master). Review before merging: check for new Prisma migrations, and confirm scripts/check-db.js still honors DIRECT_DATABASE_URL for the Supabase pooled-migration workaround. Merging this PR will trigger a normal Vercel production deploy." \
