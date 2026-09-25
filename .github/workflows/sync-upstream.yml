@@ -44,7 +44,12 @@ jobs:
         run: |
           BRANCH="sync-upstream-$(date +%Y%m%d)"
           git checkout -b "$BRANCH"
-          git merge upstream/master --no-edit
+          git merge upstream/master --no-ff --no-commit
+          # The push runs as GITHUB_TOKEN, which can never create or update
+          # workflow files, and the fork's copies of upstream's workflows are
+          # disabled by their repository guard anyway, so keep ours.
+          git restore --source=HEAD --staged --worktree .github/workflows
+          git commit --no-edit
           git push origin "$BRANCH"
           # GitHub's API can lag right after a push, so retry PR creation
           success=0
