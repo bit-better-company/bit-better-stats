@@ -44,11 +44,22 @@ jobs:
         run: |
           BRANCH="sync-upstream-$(date +%Y%m%d)"
           git checkout -b "$BRANCH"
-          git merge upstream/master --no-ff --no-commit
+          # Conflicts under .github/workflows are expected (we drop some of
+          # upstream's workflows), so let the merge stop and resolve them below.
+          git merge upstream/master --no-ff --no-commit || true
           # The push runs as GITHUB_TOKEN, which can never create or update
           # workflow files, and the fork's copies of upstream's workflows are
-          # disabled by their repository guard anyway, so keep ours.
-          git restore --source=HEAD --staged --worktree .github/workflows
+          # disabled by their repository guard anyway, so keep ours. Reset the
+          # index first: git restore refuses unmerged paths.
+          git reset -q HEAD -- .github/workflows
+          git restore --source=HEAD --worktree .github/workflows
+          git clean -fdq -- .github/workflows
+          CONFLICTS=$(git diff --name-only --diff-filter=U)
+          if [ -n "$CONFLICTS" ]; then
+            echo "Merge conflicts outside .github/workflows need a manual sync:" >&2
+            echo "$CONFLICTS" >&2
+            exit 1
+          fi
           git commit --no-edit
           git push origin "$BRANCH"
           # GitHub's API can lag right after a push, so retry PR creation
